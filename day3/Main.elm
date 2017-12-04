@@ -15,9 +15,15 @@ main =
         }
 
 
+type alias Solution =
+    { part1 : Int
+    , part2 : Int
+    }
+
+
 type alias Model =
     { input : Int
-    , output : Result String Int
+    , output : Result String Solution
     }
 
 
@@ -58,7 +64,11 @@ update msg model =
 
                         Ok input ->
                             { input = input
-                            , output = Ok (solve input)
+                            , output =
+                                Ok
+                                    { part1 = solvePart1 input
+                                    , part2 = 0
+                                    }
                             }
             in
                 ( nextModel
@@ -106,8 +116,8 @@ type Direction
     | Down
 
 
-solve : Int -> Int
-solve input =
+solvePart1 : Int -> Int
+solvePart1 input =
     let
         ( x, y ) =
             move input 1 3 Up 0 0
@@ -188,13 +198,16 @@ view model =
         ]
 
 
-viewSolution : Result String Int -> Html msg
+viewSolution : Result String Solution -> Html msg
 viewSolution solution =
     case solution of
-        Ok _ ->
+        Ok { part1, part2 } ->
             div []
-                [ text "Solution: "
-                , text <| toString <| Result.withDefault 0 solution
+                [ text "Solution to part:"
+                , ol []
+                    [ li [] [ text (toString part1) ]
+                    , li [] [ text (toString part2) ]
+                    ]
                 ]
 
         Err errMsg ->
