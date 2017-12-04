@@ -108,7 +108,60 @@ type Direction
 
 solve : Int -> Int
 solve input =
-    0
+    let
+        ( x, y ) =
+            move input 1 3 Up 0 0
+    in
+        (Basics.abs x) + (Basics.abs y)
+
+
+
+{-
+   17  16  15  14  13
+   18   5   4   3  12
+   19   6   1   2  11
+   20   7   8   9  10
+   21  22  23---> ...
+
+-}
+
+
+move : Int -> Int -> Int -> Direction -> Int -> Int -> ( Int, Int )
+move target current sideLength direction x y =
+    if target == current then
+        ( x, y )
+    else
+        let
+            distanceToTravel =
+                Basics.min (target - current) (sideLength - 1)
+
+            nextNumber =
+                current + distanceToTravel
+
+            _ =
+                Debug.log ""
+                    { target = target
+                    , current = current
+                    , sideLength = sideLength
+                    , direction = direction
+                    , x = x
+                    , y = y
+                    , distanceToTravel = distanceToTravel
+                    , nextNumber = nextNumber
+                    }
+        in
+            case direction of
+                Up ->
+                    move target nextNumber sideLength Left (x + 1) (y - 1 + distanceToTravel)
+
+                Left ->
+                    move target nextNumber sideLength Down (x - distanceToTravel) y
+
+                Down ->
+                    move target nextNumber sideLength Right x (y - distanceToTravel)
+
+                Right ->
+                    move target nextNumber (sideLength + 2) Up (x + distanceToTravel) y
 
 
 view : Model -> Html Msg
@@ -121,6 +174,17 @@ view model =
             ]
             []
         , viewSolution model.output
+        , pre []
+            [ text """
+
+   17  16  15  14  13
+   18   5   4   3  12
+   19   6   1   2  11
+   20   7   8   9  10
+   21  22  23---> ...
+
+"""
+            ]
         ]
 
 
