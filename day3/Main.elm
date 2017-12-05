@@ -212,14 +212,12 @@ test target sideLength direction x y grid =
 
         nextGridValue =
             gridValue ( nextX, nextY ) grid
-
-        nextGrid =
-            Dict.insert ( nextX, nextY ) nextGridValue grid
     in
         if nextGridValue > target then
             nextGridValue
         else
-            test target nextLength nextDir nextX nextY nextGrid
+            test target nextLength nextDir nextX nextY <|
+                Dict.insert ( nextX, nextY ) nextGridValue grid
 
 
 gridValue : ( Int, Int ) -> Grid -> Int
