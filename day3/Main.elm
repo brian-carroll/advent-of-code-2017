@@ -87,29 +87,6 @@ validate input =
             |> String.toInt
 
 
-validateRow : List String -> Result (List String) (List Int)
-validateRow row =
-    row
-        |> List.map (String.toInt)
-        |> List.foldr validateChar (Ok [])
-
-
-validateChar : Result String Int -> Result (List String) (List Int) -> Result (List String) (List Int)
-validateChar intResult acc =
-    case ( intResult, acc ) of
-        ( Err charMsg, Ok _ ) ->
-            Err [ charMsg ]
-
-        ( Err charMsg, Err strMsg ) ->
-            Err (charMsg :: strMsg)
-
-        ( Ok int, Err msg ) ->
-            Err msg
-
-        ( Ok int, Ok ints ) ->
-            Ok (int :: ints)
-
-
 type Direction
     = Right
     | Left
