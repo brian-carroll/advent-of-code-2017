@@ -68,7 +68,7 @@ update msg model =
                             , output =
                                 Ok
                                     { part1 = solvePart1 input
-                                    , part2 = 0 --solvePart2 input
+                                    , part2 = solvePart2 input
                                     }
                             }
             in
@@ -168,127 +168,65 @@ move target current sideLength direction x y =
                     move target (current + 1) sideLength Right (x + 1) y
 
 
-
-{-
-   147  142  133  122   59
-   304    5    4    2   57
-   330   10    1    1   54
-   351   11   23   25   26
-   362  747  806--->   ...
-
--}
-
-
 solvePart2 : Int -> Int
 solvePart2 input =
     let
         grid =
             Dict.insert ( 0, 0 ) 1 Dict.empty
     in
-        test input 1 3 Up 0 0 grid
+        test input 1 Right 0 0 grid
 
 
 type alias Grid =
     Dict ( Int, Int ) Int
 
 
-test : Int -> Int -> Int -> Direction -> Int -> Int -> Grid -> Int
-test target current sideLength direction x y grid =
-    if Dict.size grid > 100 then
-        current
-    else if current > target then
-        current
-    else
-        let
-            distanceToTravel =
-                Basics.min (target - current) (sideLength - 1)
-
-            nextNumber =
-                current + distanceToTravel
-
-            -- _ =
-            --     Debug.log "grid" grid
-            -- { target = target
-            -- , current = current
-            -- , sideLength = sideLength
-            -- , direction = direction
-            -- , x = x
-            -- , y = y
-            -- , distanceToTravel = distanceToTravel
-            -- , nextNumber = nextNumber
-            -- }
-        in
+test : Int -> Int -> Direction -> Int -> Int -> Grid -> Int
+test target sideLength direction x y grid =
+    let
+        ( nextLength, nextDir, nextX, nextY ) =
             case direction of
                 Up ->
-                    let
-                        nextX =
-                            x + 1
-
-                        nextY =
-                            y - 1 + distanceToTravel
-
-                        points =
-                            Debug.log (toString ( y, nextY )) <|
-                                List.map (\yi -> ( nextX, yi )) (List.range y nextY)
-
-                        newGrid =
-                            List.foldl insertIntoGrid grid points
-                    in
-                        test target nextNumber sideLength Left nextX nextY newGrid
+                    if y == sideLength // 2 then
+                        ( sideLength, Left, (x - 1), y )
+                    else
+                        ( sideLength, Up, x, (y + 1) )
 
                 Left ->
-                    let
-                        nextX =
-                            x - distanceToTravel
-
-                        points =
-                            List.range nextX x
-                                |> List.reverse
-                                |> List.map (\xi -> ( xi, y ))
-
-                        newGrid =
-                            List.foldl insertIntoGrid grid points
-                    in
-                        test target nextNumber sideLength Down nextX y newGrid
+                    if x == (negate sideLength) // 2 then
+                        ( sideLength, Down, x, (y - 1) )
+                    else
+                        ( sideLength, Left, (x - 1), y )
 
                 Down ->
-                    let
-                        nextY =
-                            y - distanceToTravel
-
-                        points =
-                            List.range nextY y
-                                |> List.reverse
-                                |> List.map (\yi -> ( x, yi ))
-
-                        newGrid =
-                            List.foldl insertIntoGrid grid points
-                    in
-                        test target nextNumber sideLength Right x nextY newGrid
+                    if y == (negate sideLength) // 2 then
+                        ( sideLength, Right, (x + 1), y )
+                    else
+                        ( sideLength, Down, x, (y - 1) )
 
                 Right ->
-                    let
-                        nextX =
-                            x + distanceToTravel
+                    if x == sideLength // 2 then
+                        ( (sideLength + 2), Up, (x + 1), y )
+                    else
+                        ( sideLength, Right, (x + 1), y )
 
-                        points =
-                            List.map (\xi -> ( xi, y )) (List.range x nextX)
+        nextGridValue =
+            gridValue ( nextX, nextY ) grid
 
-                        newGrid =
-                            List.foldl insertIntoGrid grid points
-                    in
-                        test target nextNumber (sideLength + 2) Up nextX y newGrid
-
-
-insertIntoGrid : ( Int, Int ) -> Grid -> Grid
-insertIntoGrid currentPoint grid =
-    let
-        value =
-            neighbourCoords currentPoint
-                |> List.filterMap (\point -> Dict.get point grid)
-                |> List.sum
+        nextGrid =
+            Dict.insert ( nextX, nextY ) nextGridValue grid
     in
-        Dict.insert currentPoint value grid
+        if nextGridValue > target then
+            nextGridValue
+        else
+            test target nextLength nextDir nextX nextY nextGrid
+
+
+gridValue : ( Int, Int ) -> Grid -> Int
+gridValue currentPoint grid =
+    neighbourCoords currentPoint
+        |> List.filterMap (\point -> Dict.get point grid)
+        |> List.sum
 
 
 neighbourCoords : ( Int, Int ) -> List ( Int, Int )
