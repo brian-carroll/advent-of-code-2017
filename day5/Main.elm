@@ -75,20 +75,48 @@ update msg model =
             ( model, Cmd.none )
 
 
-execute : Model -> Maybe Model
-execute { instructions, programCounter, cycles } =
+executePart1 : Model -> Maybe Model
+executePart1 { instructions, programCounter, cycles } =
     case Array.get programCounter instructions of
         Nothing ->
             Nothing
 
-        Just jump ->
+        Just offset ->
             Just
                 { programCounter =
-                    programCounter + jump
+                    programCounter + offset
                 , instructions =
-                    Array.set programCounter (jump + 1) instructions
+                    Array.set programCounter (offset + 1) instructions
                 , cycles = cycles + 1
                 }
+
+
+executePart2 : Model -> Maybe Model
+executePart2 { instructions, programCounter, cycles } =
+    case Array.get programCounter instructions of
+        Nothing ->
+            Nothing
+
+        Just offset ->
+            let
+                change =
+                    if offset >= 3 then
+                        -1
+                    else
+                        1
+            in
+                Just
+                    { programCounter =
+                        programCounter + offset
+                    , instructions =
+                        Array.set programCounter (offset + change) instructions
+                    , cycles = cycles + 1
+                    }
+
+
+execute : Model -> Maybe Model
+execute =
+    executePart2
 
 
 view : Model -> Html Msg
