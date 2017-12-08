@@ -5,6 +5,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import Task
 import Array.Hamt as Array exposing (Array)
+import List.Extra
 
 
 main : Program Never Model Msg
@@ -25,6 +26,7 @@ type alias Model =
     { banks : Banks
     , history : List Banks
     , finished : Bool
+    , period : Int
     }
 
 
@@ -44,6 +46,7 @@ init =
     ( { banks = Array.empty
       , history = []
       , finished = False
+      , period = 0
       }
     , Cmd.none
     )
@@ -91,7 +94,21 @@ update msg model =
                     )
 
         Halt _ ->
-            ( { model | finished = True }, Cmd.none )
+            let
+                maybePeriod =
+                    case model.history of
+                        [] ->
+                            Nothing
+
+                        h :: t ->
+                            List.Extra.elemIndex h t
+            in
+                ( { model
+                    | finished = True
+                    , period = 1 + (Maybe.withDefault -1 maybePeriod)
+                  }
+                , Cmd.none
+                )
 
 
 redistribute : Array Int -> Array Int
@@ -166,7 +183,7 @@ view model =
         , p []
             [ text <|
                 if model.finished then
-                    "Finished"
+                    "Period = " ++ (toString model.period)
                 else
                     "Working..."
             ]
