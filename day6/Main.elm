@@ -24,6 +24,7 @@ type alias Banks =
 type alias Model =
     { banks : Banks
     , history : List Banks
+    , finished : Bool
     }
 
 
@@ -42,6 +43,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { banks = Array.empty
       , history = []
+      , finished = False
       }
     , Cmd.none
     )
@@ -74,11 +76,12 @@ update msg model =
                     List.member newBanksArrangement model.history
 
                 newModel =
-                    { banks = newBanksArrangement
-                    , history = newBanksArrangement :: model.history
+                    { model
+                        | banks = newBanksArrangement
+                        , history = newBanksArrangement :: model.history
                     }
             in
-                if seenBefore then
+                if seenBefore || model.finished then
                     ( newModel
                     , Task.perform Halt (Task.succeed ())
                     )
@@ -88,7 +91,7 @@ update msg model =
                     )
 
         Halt _ ->
-            ( model, Cmd.none )
+            ( { model | finished = True }, Cmd.none )
 
 
 redistribute : Array Int -> Array Int
@@ -158,7 +161,14 @@ view model =
             ]
             []
         , p []
-            [ text ("# cycles to escape: " ++ toString ((List.length model.history) - 1))
+            [ text ("# cycles to repeat: " ++ toString ((List.length model.history) - 1))
+            ]
+        , p []
+            [ text <|
+                if model.finished then
+                    "Finished"
+                else
+                    "Working..."
             ]
         , p []
             [ text "In case of halting problem, click below"
