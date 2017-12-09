@@ -179,18 +179,23 @@ moveChildrenToParent _ parent dict =
                     List.foldr
                         (\child ( accChildList, accDict ) ->
                             let
-                                childFromDict =
-                                    Dict.get child.name accDict
-                                        |> Maybe.withDefault child
-
                                 dictWithoutGrandkids =
-                                    moveChildrenToParent () childFromDict accDict
+                                    case Dict.get child.name accDict of
+                                        Nothing ->
+                                            accDict
 
-                                childWithGrandkids =
-                                    Dict.get child.name dictWithoutGrandkids
-                                        |> Maybe.withDefault childFromDict
+                                        Just childFromDict ->
+                                            moveChildrenToParent () childFromDict accDict
+
+                                childWithGrandkidsList =
+                                    case Dict.get child.name dictWithoutGrandkids of
+                                        Nothing ->
+                                            []
+
+                                        Just childWithGrandkids ->
+                                            [ childWithGrandkids ]
                             in
-                                ( childWithGrandkids :: accChildList
+                                ( childWithGrandkidsList ++ accChildList
                                 , Dict.remove child.name dictWithoutGrandkids
                                 )
                         )
