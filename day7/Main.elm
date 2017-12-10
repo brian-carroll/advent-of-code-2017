@@ -27,7 +27,7 @@ type Children
 type alias Model =
     { parsedLines : Dict String Prog
     , parseErrors : List Parser.Error
-    , tree : List Prog
+    , tree : Maybe Prog
     }
 
 
@@ -55,7 +55,7 @@ init : ( Model, Cmd Msg )
 init =
     ( { parsedLines = Dict.empty
       , parseErrors = []
-      , tree = []
+      , tree = Nothing
       }
     , Cmd.none
     )
@@ -77,9 +77,14 @@ view model =
         ]
 
 
-viewTree : List Prog -> Html msg
+viewTree : Maybe Prog -> Html msg
 viewTree tree =
-    ul [] (List.map viewProg tree)
+    case tree of
+        Just root ->
+            ul [] [ viewProg root ]
+
+        Nothing ->
+            div [] []
 
 
 viewProg : Prog -> Html msg
@@ -157,7 +162,7 @@ if has no children, skip
 if has children
 recursively move descendants from dict to parent
 -}
-buildTree : Dict String Prog -> List Prog
+buildTree : Dict String Prog -> Maybe Prog
 buildTree dict =
     let
         newDict =
@@ -169,6 +174,7 @@ buildTree dict =
                 dict
     in
         Dict.values newDict
+            |> List.head
 
 
 moveChildrenToParent : String -> Dict String Prog -> Dict String Prog
