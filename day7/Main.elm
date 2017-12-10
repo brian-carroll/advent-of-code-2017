@@ -120,7 +120,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ParseInput input ->
-            ( parseInput input model
+            ( parseInput input (Tuple.first init)
             , Task.perform BuildTree (Task.succeed ())
             )
 
@@ -155,56 +155,53 @@ parseInput input model =
 fold over all dict keys
 if has no children, skip
 if has children
-recursively
-move descendants from dict to parent
+recursively move descendants from dict to parent
 -}
 buildTree : Dict String Prog -> List Prog
 buildTree dict =
     let
         newDict =
             Dict.foldl
-                moveChildrenToParent
+                (\key value acc ->
+                    moveChildrenToParent key acc
+                )
                 dict
                 dict
     in
         Dict.values newDict
 
 
-moveChildrenToParent : a -> Prog -> Dict String Prog -> Dict String Prog
-moveChildrenToParent _ parent dict =
-    case parent.children of
-        Children childList ->
-            let
-                ( newChildList, smallerDict ) =
-                    List.foldr
-                        (\child ( accChildList, accDict ) ->
-                            let
-                                dictWithoutGrandkids =
-                                    case Dict.get child.name accDict of
-                                        Nothing ->
-                                            accDict
+moveChildrenToParent : String -> Dict String Prog -> Dict String Prog
+moveChildrenToParent parentName dict =
+    case Dict.get parentName dict of
+        Nothing ->
+            dict
 
-                                        Just childFromDict ->
-                                            moveChildrenToParent () childFromDict accDict
+        Just parent ->
+            case parent.children of
+                Children childList ->
+                    let
+                        ( newChildList, smallerDict ) =
+                            List.foldr
+                                (\child ( accChildList, accDict ) ->
+                                    let
+                                        dictWithoutGrandkids =
+                                            moveChildrenToParent child.name accDict
 
-                                childWithGrandkidsList =
-                                    case Dict.get child.name dictWithoutGrandkids of
-                                        Nothing ->
-                                            []
-
-                                        Just childWithGrandkids ->
-                                            [ childWithGrandkids ]
-                            in
-                                ( childWithGrandkidsList ++ accChildList
-                                , Dict.remove child.name dictWithoutGrandkids
+                                        childTree =
+                                            Dict.get child.name dictWithoutGrandkids
+                                                |> Maybe.withDefault child
+                                    in
+                                        ( childTree :: accChildList
+                                        , Dict.remove child.name dictWithoutGrandkids
+                                        )
                                 )
-                        )
-                        ( [], dict )
-                        childList
-            in
-                Dict.insert parent.name
-                    { parent | children = Children newChildList }
-                    smallerDict
+                                ( [], dict )
+                                childList
+                    in
+                        Dict.insert parent.name
+                            { parent | children = Children newChildList }
+                            smallerDict
 
 
 
@@ -278,3 +275,23 @@ progParser =
 inputParser : Parser (List Prog)
 inputParser =
     repeat oneOrMore progParser
+
+
+{-| Example for REPL debugging
+-}
+exampleInput : String
+exampleInput =
+    """pbga (66)
+xhth (57)
+ebii (61)
+havc (66)
+ktlj (57)
+fwft (72) -> ktlj, cntj, xhth
+qoyq (66)
+padx (45) -> pbga, havc, qoyq
+tknk (41) -> ugml, padx, fwft
+jptl (61)
+ugml (68) -> gyxo, ebii, jptl
+gyxo (61)
+cntj (57)
+"""
