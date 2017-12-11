@@ -20,10 +20,14 @@ type Msg
 
 
 type alias Model =
-    { registers : Dict String Int
+    { registers : Registers
     , instructions : Array Instruction
     , parseError : Maybe Parser.Error
     }
+
+
+type alias Registers =
+    Dict String Int
 
 
 type Direction
@@ -130,19 +134,29 @@ viewErrorSource error =
 
 viewRegisters : Dict String Int -> Html msg
 viewRegisters registers =
-    table []
-        (Dict.foldr
-            (\name value acc ->
-                (tr []
-                    [ td [] [ text name ]
-                    , td [] [ text (toString value) ]
-                    ]
+    let
+        maxVal =
+            Dict.values registers
+                |> List.maximum
+                |> Maybe.withDefault 0
+    in
+        div []
+            [ h3 [] [ text "Registers" ]
+            , text ("Largest value: " ++ (toString maxVal))
+            , table []
+                (Dict.foldr
+                    (\name value acc ->
+                        (tr []
+                            [ td [] [ text name ]
+                            , td [] [ text (toString value) ]
+                            ]
+                        )
+                            :: acc
+                    )
+                    []
+                    registers
                 )
-                    :: acc
-            )
-            []
-            registers
-        )
+            ]
 
 
 
@@ -154,11 +168,11 @@ update msg model =
     case msg of
         ParseInput input ->
             ( parseInput input (Tuple.first init)
-            , Task.perform Done (Task.succeed ())
+            , Task.perform Execute (Task.succeed 0)
             )
 
-        Execute _ ->
-            ( model, Cmd.none )
+        Execute pc ->
+            execute model pc
 
         Done _ ->
             ( model, Cmd.none )
@@ -174,7 +188,81 @@ parseInput input model =
             }
 
         Err e ->
-            { model | parseError = Just e }
+            { model
+                | parseError = Just e
+            }
+
+
+
+-- Execute instructions
+
+
+execute : Model -> Int -> ( Model, Cmd Msg )
+execute model pc =
+    case Array.get pc model.instructions of
+        Just instruction ->
+            ( { model
+                | registers =
+                    executeInstruction instruction model.registers
+              }
+            , Task.perform Execute (Task.succeed (pc + 1))
+            )
+
+        Nothing ->
+            ( model
+            , Task.perform Done (Task.succeed ())
+            )
+
+
+executeInstruction : Instruction -> Registers -> Registers
+executeInstruction { updateReg, dir, amount, condReg, condOp, condVal } registers =
+    let
+        condRegVal =
+            Dict.get condReg registers
+                |> Maybe.withDefault 0
+
+        isConditionTrue =
+            case condOp of
+                EQ ->
+                    condRegVal == condVal
+
+                NE ->
+                    condRegVal /= condVal
+
+                GT ->
+                    condRegVal > condVal
+
+                LT ->
+                    condRegVal < condVal
+
+                GE ->
+                    condRegVal >= condVal
+
+                LE ->
+                    condRegVal <= condVal
+    in
+        if isConditionTrue then
+            case dir of
+                Inc ->
+                    Dict.update
+                        updateReg
+                        (updateRegister amount)
+                        registers
+
+                Dec ->
+                    Dict.update
+                        updateReg
+                        (updateRegister (negate amount))
+                        registers
+        else
+            registers
+
+
+updateRegister : Int -> Maybe Int -> Maybe Int
+updateRegister increment maybeVal =
+    Maybe.withDefault 0 maybeVal
+        |> ((+) increment)
+        |> Just
 
 
 
