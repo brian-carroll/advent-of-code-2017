@@ -28,12 +28,14 @@ type alias Model =
     { parsedLines : Dict String Prog
     , parseErrors : List Parser.Error
     , tree : Maybe Prog
+    , imbalance : Maybe IterationResult
     }
 
 
 type Msg
     = ParseInput String
     | BuildTree ()
+    | FindImbalance ()
     | Done ()
 
 
@@ -56,6 +58,7 @@ init =
     ( { parsedLines = Dict.empty
       , parseErrors = []
       , tree = Nothing
+      , imbalance = Nothing
       }
     , Cmd.none
     )
@@ -73,8 +76,25 @@ view model =
             ]
             []
         , viewParseErrors model.parseErrors
+        , viewImbalance model.imbalance
+        , h2 [] [ text "Tree" ]
         , viewTree model.tree
         ]
+
+
+viewImbalance : Maybe IterationResult -> Html msg
+viewImbalance imbalance =
+    case imbalance of
+        Just (Imbalance badProg correctWeight) ->
+            div []
+                [ h2 [] [ text "Imbalanced program" ]
+                , p [] [ text ("Program " ++ badProg.name) ]
+                , p [] [ text ("Actual weight: " ++ toString (ownWeight badProg)) ]
+                , p [] [ text ("Correct weight: " ++ toString correctWeight) ]
+                ]
+
+        _ ->
+            div [] []
 
 
 viewTree : Maybe Prog -> Html msg
@@ -133,6 +153,13 @@ update msg model =
             ( { model
                 | tree = buildTree model.parsedLines
               }
+            , Task.perform FindImbalance (Task.succeed ())
+            )
+
+        FindImbalance _ ->
+            ( { model
+                | imbalance = Maybe.map findImbalance model.tree
+              }
             , Task.perform Done (Task.succeed ())
             )
 
@@ -154,6 +181,124 @@ parseInput input model =
 
         Err e ->
             { model | parseErrors = [ e ] }
+
+
+type IterationResult
+    = SubTreeWeight Int
+    | Imbalance Prog Int
+
+
+isImbalance : IterationResult -> Bool
+isImbalance iterationResult =
+    case iterationResult of
+        Imbalance badProg extraWeight ->
+            True
+
+        SubTreeWeight w ->
+            False
+
+
+getSubTreeWeights : List IterationResult -> List Int
+getSubTreeWeights iterationResults =
+    List.filterMap
+        (\ir ->
+            case ir of
+                Imbalance _ _ ->
+                    Nothing
+
+                SubTreeWeight w ->
+                    Just w
+        )
+        iterationResults
+
+
+findImbalance : Prog -> IterationResult
+findImbalance prog =
+    case prog.children of
+        Children childList ->
+            let
+                iterationResults =
+                    List.map findImbalance childList
+            in
+                case List.filter isImbalance iterationResults of
+                    alreadyFound :: _ ->
+                        alreadyFound
+
+                    [] ->
+                        let
+                            -- We know all iterationResults are SubTreeWeights, but the type checker doesn't!
+                            -- we need to filter (and unwrap) them
+                            subTreeWeights =
+                                getSubTreeWeights iterationResults
+
+                            progsAndSubTreeWeights =
+                                List.map2 (,) childList subTreeWeights
+
+                            mostCommonWeight =
+                                mostCommonValue subTreeWeights
+
+                            imbalancedProgs =
+                                List.filter
+                                    -- next line is wrong, it's not ownWeight, it's subtreeweight
+                                    (\( child, stw ) -> stw /= mostCommonWeight)
+                                    progsAndSubTreeWeights
+                        in
+                            case imbalancedProgs of
+                                [] ->
+                                    -- next line is wrong, it's not ownWeight, it's subtreeweight
+                                    SubTreeWeight (ownWeight prog + List.sum subTreeWeights)
+
+                                ( badProg, stw ) :: _ ->
+                                    let
+                                        correctWeight =
+                                            (ownWeight badProg) - (stw - mostCommonWeight)
+                                    in
+                                        Imbalance badProg correctWeight
+
+
+mostCommonValue : List Int -> Int
+mostCommonValue list =
+    let
+        histogram =
+            List.foldl
+                (\num -> Dict.update num incrementFreq)
+                Dict.empty
+                list
+
+        ( mostCommonVal, _ ) =
+            Dict.foldl
+                (\val freq ( accVal, accFreq ) ->
+                    if freq > accFreq then
+                        ( val, freq )
+                    else
+                        ( accVal, accFreq )
+                )
+                ( 0, 0 )
+                histogram
+    in
+        mostCommonVal
+
+
+incrementFreq : Maybe Int -> Maybe Int
+incrementFreq maybeCount =
+    Maybe.withDefault 0 maybeCount
+        |> ((+) 1)
+        |> Just
+
+
+totalWeight : Prog -> Int
+totalWeight tree =
+    ownWeight tree + List.sum (childWeights tree.children)
+
+
+childWeights : Children -> List Int
+childWeights (Children childList) =
+    List.map totalWeight childList
+
+
+ownWeight : Prog -> Int
+ownWeight prog =
+    Maybe.withDefault 0 prog.weight
 
 
 {-| Remove children from the flat dict and put them into the tree structure
