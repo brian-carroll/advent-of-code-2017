@@ -23,6 +23,8 @@ type alias Model =
     { registers : Registers
     , instructions : Array Instruction
     , parseError : Maybe Parser.Error
+    , largestValue : Int
+    , largestValueEver : Int
     }
 
 
@@ -73,6 +75,8 @@ init =
     ( { registers = Dict.empty
       , instructions = Array.empty
       , parseError = Nothing
+      , largestValue = 0
+      , largestValueEver = 0
       }
     , Cmd.none
     )
@@ -94,6 +98,8 @@ view model =
             ]
             []
         , viewError model.parseError
+        , p [] [ text ("Largest value: " ++ (toString model.largestValue)) ]
+        , p [] [ text ("Largest value ever: " ++ (toString model.largestValueEver)) ]
         , viewRegisters model.registers
         ]
 
@@ -134,29 +140,29 @@ viewErrorSource error =
 
 viewRegisters : Dict String Int -> Html msg
 viewRegisters registers =
-    let
-        maxVal =
-            Dict.values registers
-                |> List.maximum
-                |> Maybe.withDefault 0
-    in
-        div []
-            [ h3 [] [ text "Registers" ]
-            , text ("Largest value: " ++ (toString maxVal))
-            , table []
-                (Dict.foldr
-                    (\name value acc ->
-                        (tr []
-                            [ td [] [ text name ]
-                            , td [] [ text (toString value) ]
-                            ]
-                        )
-                            :: acc
+    div []
+        [ h3 [] [ text "Registers" ]
+        , table []
+            (Dict.foldr
+                (\name value acc ->
+                    (tr []
+                        [ td [] [ text name ]
+                        , td [] [ text (toString value) ]
+                        ]
                     )
-                    []
-                    registers
+                        :: acc
                 )
-            ]
+                []
+                registers
+            )
+        ]
+
+
+largestRegister : Registers -> Int
+largestRegister registers =
+    Dict.values registers
+        |> List.maximum
+        |> Maybe.withDefault 0
 
 
 
@@ -201,12 +207,20 @@ execute : Model -> Int -> ( Model, Cmd Msg )
 execute model pc =
     case Array.get pc model.instructions of
         Just instruction ->
-            ( { model
-                | registers =
+            let
+                registers =
                     executeInstruction instruction model.registers
-              }
-            , Task.perform Execute (Task.succeed (pc + 1))
-            )
+
+                largestValue =
+                    largestRegister registers
+            in
+                ( { model
+                    | registers = registers
+                    , largestValue = largestValue
+                    , largestValueEver = Basics.max largestValue model.largestValueEver
+                  }
+                , Task.perform Execute (Task.succeed (pc + 1))
+                )
 
         Nothing ->
             ( model
