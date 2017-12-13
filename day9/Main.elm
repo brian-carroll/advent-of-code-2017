@@ -5,6 +5,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import Parser exposing (..)
 import Parser.LanguageKit as Parser exposing (..)
+import Input exposing (stream)
 
 
 type Msg
@@ -17,7 +18,7 @@ type alias Group =
 
 type Element
     = SubGroup Group
-    | Garbage
+    | Garbage String
 
 
 type alias Model =
@@ -45,15 +46,34 @@ elementParser =
         [ Parser.map
             SubGroup
             (lazy (\_ -> groupParser))
-        , Parser.map
-            (\_ -> Garbage)
-            garbageParser
+        , Parser.map Garbage garbageParser
         ]
 
 
-garbageParser : Parser ()
+garbageParser : Parser String
 garbageParser =
-    symbol "whatevs"
+    inContext "garbage" <|
+        succeed String.concat
+            |. symbol "<"
+            |= repeat zeroOrMore garbageCharParser
+            |. symbol ">"
+
+
+garbageCharParser : Parser String
+garbageCharParser =
+    oneOf
+        [ cancelParser
+        , keep (Exactly 1) ((/=) '>')
+        ]
+
+
+cancelParser : Parser String
+cancelParser =
+    inContext "cancel" <|
+        (succeed (++)
+            |= keep (Exactly 1) ((==) '!')
+            |= keep (Exactly 1) (\c -> True)
+        )
 
 
 groupExamples : List ( String, Int )
@@ -67,3 +87,92 @@ groupExamples =
     , ( "{{<a>},{<a>},{<a>},{<a>}}", 5 )
     , ( "{{<!>},{<!>},{<!>},{<a>}}", 2 )
     ]
+
+
+scoreExamples =
+    [ ( "{}", 1 )
+    , ( "{{{}}}", 6 )
+    , ( "{{},{}}", 5 )
+    , ( "{{{},{},{{}}}}", 16 )
+    , ( "{<a>,<a>,<a>,<a>}", 1 )
+    , ( "{{<ab>},{<ab>},{<ab>},{<ab>}}", 9 )
+    , ( "{{<!!>},{<!!>},{<!!>},{<!!>}}", 9 )
+    , ( "{{<a!>},{<a!>},{<a!>},{<ab>}}", 3 )
+    ]
+
+
+score : Group -> Int
+score group =
+    groupScore 1 group
+
+
+groupScore : Int -> Group -> Int
+groupScore depth group =
+    List.map (elementScore depth) group
+        |> List.sum
+        |> (+) depth
+
+
+elementScore : Int -> Element -> Int
+elementScore depth element =
+    case element of
+        SubGroup group ->
+            groupScore (depth + 1) group
+
+        Garbage _ ->
+            0
+
+
+testScore =
+    List.map
+        (\( str, expected ) ->
+            case run groupParser str of
+                Ok group ->
+                    let
+                        actual =
+                            score group
+                    in
+                        if actual == expected then
+                            "Correct " ++ (toString expected)
+                        else
+                            "Got "
+                                ++ (toString actual)
+                                ++ " expected "
+                                ++ (toString expected)
+
+                Err e ->
+                    toString e
+        )
+        scoreExamples
+
+
+inputScore =
+    case run groupParser stream of
+        Ok group ->
+            Ok (score group)
+
+        Err err ->
+            Err err
+
+
+singleGarbageExamples : List String
+singleGarbageExamples =
+    [ "<>"
+    , "<random characters>"
+    , "<<<<>"
+    , "<{!>}>"
+    , "<!!>"
+    , "<!!!>>"
+    , "<{o\"i!a,<{i<a>"
+    ]
+
+
+testGarbage =
+    List.map (run garbageParser) singleGarbageExamples
+
+
+pretty : List a -> String
+pretty list =
+    Debug.log
+        (list |> List.map toString |> String.join "\n")
+        ""
