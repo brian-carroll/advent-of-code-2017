@@ -70,9 +70,9 @@ garbageCharParser =
 cancelParser : Parser String
 cancelParser =
     inContext "cancel" <|
-        (succeed (++)
-            |= keep (Exactly 1) ((==) '!')
-            |= keep (Exactly 1) (\c -> True)
+        (succeed ""
+            |. keep (Exactly 1) ((==) '!')
+            |. keep (Exactly 1) (\c -> True)
         )
 
 
@@ -123,6 +123,20 @@ elementScore depth element =
             0
 
 
+countGarbage group =
+    List.map countGarbageInElement group
+        |> List.sum
+
+
+countGarbageInElement element =
+    case element of
+        SubGroup group ->
+            countGarbage group
+
+        Garbage str ->
+            String.length str
+
+
 testScore =
     List.map
         (\( str, expected ) ->
@@ -147,12 +161,13 @@ testScore =
 
 
 inputScore =
-    case run groupParser stream of
-        Ok group ->
-            Ok (score group)
+    run groupParser stream
+        |> Result.map score
 
-        Err err ->
-            Err err
+
+inputGarbageCount =
+    run groupParser stream
+        |> Result.map countGarbage
 
 
 singleGarbageExamples : List String
@@ -167,7 +182,7 @@ singleGarbageExamples =
     ]
 
 
-testGarbage =
+testGarbageParser =
     List.map (run garbageParser) singleGarbageExamples
 
 
