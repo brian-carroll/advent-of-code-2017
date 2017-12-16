@@ -13,16 +13,31 @@ size =
     256
 
 
+hashRound : List Int -> CircularList
+hashRound sectionLengths =
+    List.foldl
+        CircularList.reverseSection
+        (CircularList.create size)
+        sectionLengths
+
+
 finalCircularList : CircularList
 finalCircularList =
-    List.foldl
-        (\len acc ->
-            CircularList.reverseSection len acc
-        )
-        (CircularList.create size)
-        input
+    hashRound input
 
 
-answer : Int
-answer =
+answerPart1 : Int
+answerPart1 =
     CircularList.check finalCircularList
+
+
+inputPart2 : String
+inputPart2 =
+    input
+        |> List.map toString
+        |> String.join ","
+
+
+answerPart2 : String
+answerPart2 =
+    CircularList.knotHash inputPart2

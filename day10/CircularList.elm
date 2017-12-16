@@ -1,12 +1,16 @@
-module CircularList
-    exposing
-        ( CircularList
-        , reverseSection
-        , create
-        , check
-        )
+module CircularList exposing (..)
+
+-- ( CircularList
+-- , reverseSection
+-- , create
+-- , check
+-- , knotHash
+-- )
 
 import Array.Hamt as Array exposing (..)
+import Bitwise
+import Hex
+import Ascii
 
 
 {-| opaque type
@@ -108,3 +112,61 @@ check (CircularList c) =
         |> Array.toList
         |> List.take 2
         |> List.product
+
+
+suffix : List Int
+suffix =
+    [ 17, 31, 73, 47, 23 ]
+
+
+knotHash : String -> String
+knotHash input =
+    let
+        charCodes =
+            (Ascii.fromString input) ++ suffix
+
+        sparseHashClist =
+            iterateHash 64 charCodes (create 256)
+
+        sparse =
+            case sparseHashClist of
+                CircularList c ->
+                    c.values
+    in
+        condense sparse
+            |> List.map zeroPadHexToString
+            |> String.concat
+
+
+zeroPadHexToString : Int -> String
+zeroPadHexToString n =
+    Hex.toString n
+        |> (++) "0"
+        |> String.right 2
+
+
+iterateHash : Int -> List Int -> CircularList -> CircularList
+iterateHash iters input circularList =
+    if iters <= 0 then
+        circularList
+    else
+        let
+            newCircularList =
+                List.foldl
+                    reverseSection
+                    circularList
+                    input
+        in
+            iterateHash (iters - 1) input newCircularList
+
+
+condense : Array Int -> List Int
+condense sparse =
+    List.range 0 15
+        |> List.map
+            (\idx ->
+                idx
+                    |> ((*) 16)
+                    |> (\i -> Array.slice i (i + 16) sparse)
+                    |> Array.foldl Bitwise.xor 0
+            )
