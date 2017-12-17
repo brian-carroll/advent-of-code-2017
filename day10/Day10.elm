@@ -1,6 +1,7 @@
-module Main exposing (..)
+module Day10 exposing (..)
 
 import CircularList exposing (CircularList)
+import KnotHash
 
 
 input : List Int
@@ -40,4 +41,4 @@ inputPart2 =
 
 answerPart2 : String
 answerPart2 =
-    CircularList.knotHash inputPart2
+    KnotHash.hash inputPart2
