@@ -1,4 +1,4 @@
-module KnotHash exposing (hash)
+module KnotHash exposing (hash, hashBytes)
 
 import CircularList exposing (CircularList(..))
 import Bitwise
@@ -12,8 +12,8 @@ suffix =
     [ 17, 31, 73, 47, 23 ]
 
 
-hash : String -> String
-hash input =
+hashBytes : String -> List Int
+hashBytes input =
     let
         charCodes =
             (Ascii.fromString input) ++ suffix
@@ -27,8 +27,13 @@ hash input =
                     c.values
     in
         condense sparse
-            |> List.map zeroPadHexToString
-            |> String.concat
+
+
+hash : String -> String
+hash input =
+    hashBytes input
+        |> List.map zeroPadHexToString
+        |> String.concat
 
 
 zeroPadHexToString : Int -> String
