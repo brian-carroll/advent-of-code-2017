@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Dict exposing (Dict)
+import Input exposing (input)
 
 
 -- Directions
@@ -119,183 +119,6 @@ distance hex =
         |> sqrt
 
 
-
-{-
-   Dijkstra's algorithm
-   - Start with
-       - initial set of nodes, all unvisited
-           - #steps from origin = Nothing
-       - Need to generate all possible nodes!
-       - Maybe better to do it implicitly somehow
-       - any node with X and Y abs values < final node are valid
-    - For current Hex
-        - Step in all directions
-            - Check if this node is in range (X & Y < target)
-            - If not, don't change state for next iteration
-            - If in range
-                - If has value in Dict,
-                    - Replace with smaller of
-                        parent steps + 1
-                        existing value
-                - If not in Dict yet
-                    - Put it in with parent steps + 1
-                    - Add it to the set of unvisited nodes
-        - We have just visited the node
-            - remove it from unvisited nodes
-        - Pick up next unvisted node
-            - visit it
-
-    Data structure
-        - type alias Point = (Float, Float)
-        - Dict Point (Int, Point)
-        -      self, steps from origin, parent
--}
-{-
-   Finite precison issue (accumulated errors)
-   GETting a hex point from a Dict may not work if the value is slightly off
-    May need to deliberately limit precision in a controlled way?
-    Give the point a hash ID made of rounded X and Y?
-    Also store the exact values?
--}
-
-
-{-| Adjacency table
--}
-type alias HashTable =
-    Dict Hash TableEntry
-
-
-type alias Hash =
-    ( Int, Int )
-
-
-type alias TableEntry =
-    { self : Hex
-    , parentHash : Hash
-    , steps : Maybe Int
-    }
-
-
-dijkstra : Hex -> Int
-dijkstra ( x, y ) =
-    let
-        bottomLeft =
-            ( min 0 x
-            , min 0 y
-            )
-
-        topRight =
-            ( max 0 x
-            , max 0 y
-            )
-
-        unvisited =
-            fillGrid (hexInBounds ( x, y )) topRight bottomLeft []
-
-        initHashTable =
-            Dict.insert
-                (hash origin)
-                { self = ( 0, 0 )
-                , parentHash = ( 0, 0 )
-                , steps = Just 0
-                }
-                Dict.empty
-    in
-        0
-
-
-{-| Create a grid, given the max X and Y boundary
--}
-fillGrid : (Hex -> Bool) -> Hex -> Hex -> List Hex -> List Hex
-fillGrid boundsCheck topRight current list =
-    if not (boundsCheck current) then
-        list
-    else
-        fillGrid
-            boundsCheck
-            topRight
-            (step N current)
-            (fillRow boundsCheck topRight current list)
-
-
-fillRow : (Hex -> Bool) -> Hex -> Hex -> List Hex -> List Hex
-fillRow boundsCheck topRight current list =
-    if boundsCheck current then
-        list
-    else
-        let
-            hex1 =
-                step SE current
-
-            hex2 =
-                step NE hex1
-        in
-            fillRow
-                boundsCheck
-                topRight
-                hex2
-                (hex2 :: hex1 :: list)
-
-
-visit : Hex -> HashTable -> TableEntry -> HashTable
-visit boundary table currentEntry =
-    let
-        childEntries =
-            allDirections
-                |> List.map (flip step currentEntry.self)
-                |> List.filter (hexInBounds boundary)
-                |> List.map
-                    (\hex ->
-                        { self = hex
-                        , parentHash = hash currentEntry.self
-                        , steps = Maybe.map ((+) 1) currentEntry.steps
-                        }
-                    )
-    in
-        List.foldl
-            (\entry accTable ->
-                Dict.update
-                    (hash entry.self)
-                    (updateTable entry)
-                    accTable
-            )
-            table
-            childEntries
-
-
-{-| Hash to manage rounding errors in Dict keys
-
-Taking two different paths to the same hex could result in two *slightly* different
-values for its coordinates (at the nth decimal place)
-So we could *think* something is not in the table when actually it is. Yuck.
-Make sure we always round to the nearest 'hex', in a controlled way.
-
--}
-hash : Hex -> Hash
-hash ( x, y ) =
-    ( round (x * 10)
-    , round (y * 10)
-    )
-
-
-updateTable : TableEntry -> Maybe TableEntry -> Maybe TableEntry
-updateTable new maybeOld =
-    case maybeOld of
-        Nothing ->
-            Just new
-
-        Just old ->
-            case ( new.steps, old.steps ) of
-                ( Just newSteps, Just oldSteps ) ->
-                    if newSteps < oldSteps then
-                        Just new
-                    else
-                        Just old
-
-                _ ->
-                    Just new
-
-
 allDirections : List Direction
 allDirections =
     [ N, NE, NW, S, SE, SW ]
@@ -318,6 +141,92 @@ coordInBounds bound test =
 isOrigin : Hex -> Bool
 isOrigin ( x, y ) =
     (x < 0.1) && (y < 0.1)
+
+
+
+{-
+
+   SHORTEST PATH
+
+-}
+
+
+findLeastSteps : Hex -> Float -> Int -> Int
+findLeastSteps current currentDistSq steps =
+    if isOrigin current then
+        steps
+    else
+        let
+            ( closest, closestDistSq ) =
+                allDirections
+                    |> List.map
+                        (\dir ->
+                            let
+                                neighbour =
+                                    step dir current
+                            in
+                                ( neighbour, distSq neighbour )
+                        )
+                    |> List.foldl
+                        (\( hex, d2 ) ( accHex, accDistSq ) ->
+                            if d2 < accDistSq then
+                                ( hex, d2 )
+                            else
+                                ( accHex, accDistSq )
+                        )
+                        ( current, currentDistSq )
+        in
+            findLeastSteps closest closestDistSq (steps + 1)
+
+
+answerPart1 : Int
+answerPart1 =
+    directionsFromString input
+        |> followDirections
+        |> (\hex ->
+                findLeastSteps hex (distSq hex) 0
+           )
+
+
+
+{-
+
+   PART 2
+
+-}
+
+
+furthestAway : List Direction -> Hex
+furthestAway dirList =
+    let
+        ( _, furthestHex, _ ) =
+            List.foldl
+                (\dir ( current, furthest, maxDistSq ) ->
+                    let
+                        next =
+                            step dir current
+
+                        d2 =
+                            distSq next
+                    in
+                        if d2 > maxDistSq then
+                            ( next, next, d2 )
+                        else
+                            ( next, furthest, maxDistSq )
+                )
+                ( origin, origin, 0 )
+                dirList
+    in
+        furthestHex
+
+
+answerPart2 : Int
+answerPart2 =
+    directionsFromString input
+        |> furthestAway
+        |> (\hex ->
+                findLeastSteps hex (distSq hex) 0
+           )
 
 
 {-| Directions examples
