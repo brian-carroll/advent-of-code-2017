@@ -58,14 +58,19 @@ traverse current acc =
                 childList
 
 
+findGroupContaining : Int -> Connections -> Accumulator
+findGroupContaining start connections =
+    traverse start
+        { connections = connections
+        , group = Set.singleton 0
+        }
+
+
 groupSize : Int -> Connections -> Int
 groupSize start connections =
     let
         finalAcc =
-            traverse 0
-                { connections = connections
-                , group = Set.singleton 0
-                }
+            findGroupContaining start connections
     in
         Set.size finalAcc.group
 
@@ -88,7 +93,46 @@ answerExample =
     groupSize 0 example
 
 
+inputConnections : Connections
+inputConnections =
+    parseInput input
+
+
 answerPart1 : Int
 answerPart1 =
-    parseInput input
+    inputConnections
         |> groupSize 0
+
+
+
+{-
+
+   PART 2
+
+-}
+
+
+countGroups : Int -> Connections -> Int
+countGroups groupCount connections =
+    case getFirstKey connections of
+        Nothing ->
+            groupCount
+
+        Just firstKey ->
+            let
+                acc : Accumulator
+                acc =
+                    findGroupContaining firstKey connections
+            in
+                countGroups (groupCount + 1) acc.connections
+
+
+getFirstKey : Dict comparable v -> Maybe comparable
+getFirstKey dict =
+    Dict.keys dict
+        |> List.head
+
+
+answerPart2 : Int
+answerPart2 =
+    countGroups 0 inputConnections
