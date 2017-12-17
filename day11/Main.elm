@@ -196,37 +196,31 @@ answerPart1 =
 -}
 
 
-furthestAway : List Direction -> Hex
+furthestAway : List Direction -> Int
 furthestAway dirList =
-    let
-        ( _, furthestHex, _ ) =
-            List.foldl
-                (\dir ( current, furthest, maxDistSq ) ->
-                    let
-                        next =
-                            step dir current
+    List.foldl
+        (\dir ( current, maxSteps ) ->
+            let
+                next =
+                    step dir current
 
-                        d2 =
-                            distSq next
-                    in
-                        if d2 > maxDistSq then
-                            ( next, next, d2 )
-                        else
-                            ( next, furthest, maxDistSq )
-                )
-                ( origin, origin, 0 )
-                dirList
-    in
-        furthestHex
+                nextSteps =
+                    findLeastSteps next (distSq next) 0
+            in
+                if nextSteps > maxSteps then
+                    ( next, nextSteps )
+                else
+                    ( next, maxSteps )
+        )
+        ( origin, 0 )
+        dirList
+        |> Tuple.second
 
 
 answerPart2 : Int
 answerPart2 =
     directionsFromString input
         |> furthestAway
-        |> (\hex ->
-                findLeastSteps hex (distSq hex) 0
-           )
 
 
 {-| Directions examples
