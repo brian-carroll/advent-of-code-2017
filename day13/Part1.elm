@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Part1 exposing (..)
 
 import Input exposing (input)
 import Dict exposing (Dict)
