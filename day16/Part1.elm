@@ -1,5 +1,12 @@
 module Part1 exposing (..)
 
+import Parser exposing (..)
+import Char
+import Input exposing (input)
+
+
+-- import Parser.LanguageKit as Parser
+
 
 type DanceMove
     = Spin Int
@@ -84,6 +91,14 @@ doMove move lineup =
             partner a b lineup
 
 
+dance : String -> List DanceMove -> String
+dance initLineup moves =
+    List.foldl
+        doMove
+        initLineup
+        moves
+
+
 example =
     { lineup = "abcde"
     , moves = [ Spin 1, Exchange 3 4, Partner "e" "b" ]
@@ -92,7 +107,73 @@ example =
 
 exampleAnswer : String
 exampleAnswer =
-    List.foldl
-        doMove
+    dance
         example.lineup
         example.moves
+
+
+
+{-
+
+   PARSER
+
+-}
+
+
+danceParser : Parser (List DanceMove)
+danceParser =
+    repeat oneOrMore
+        (danceMoveParser
+            |. oneOf
+                [ symbol ","
+                , end
+                ]
+        )
+
+
+danceMoveParser : Parser DanceMove
+danceMoveParser =
+    oneOf
+        [ spinParser
+        , exchangeParser
+        , partnerParser
+        ]
+
+
+spinParser : Parser DanceMove
+spinParser =
+    succeed Spin
+        |. symbol "s"
+        |= int
+
+
+exchangeParser : Parser DanceMove
+exchangeParser =
+    succeed Exchange
+        |. symbol "x"
+        |= int
+        |. symbol "/"
+        |= int
+
+
+partnerParser : Parser DanceMove
+partnerParser =
+    succeed Partner
+        |. symbol "p"
+        |= keep (Exactly 1) Char.isLower
+        |. symbol "/"
+        |= keep (Exactly 1) Char.isLower
+
+
+
+{-
+
+   SOLUTION
+
+-}
+
+
+solution : Result Error String
+solution =
+    Parser.run danceParser input
+        |> Result.map (dance "abcdefghijklmnop")
