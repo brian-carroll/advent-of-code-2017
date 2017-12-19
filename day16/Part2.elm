@@ -66,6 +66,11 @@ answer _ =
         List.indexedMap (,) pattern
             |> Debug.log "pattern"
             |> List.filter (\( i, s ) -> i == remainder)
-            |> List.head
-            |> Maybe.map Tuple.second
-            |> Maybe.withDefault ""
+            |> (\x ->
+                    case x of
+                        [ ( _, s ) ] ->
+                            s
+
+                        _ ->
+                            ""
+               )
