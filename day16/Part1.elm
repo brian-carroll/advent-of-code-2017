@@ -173,7 +173,17 @@ partnerParser =
 -}
 
 
-solution : Result Error String
-solution =
+initialLineup : String
+initialLineup =
+    "abcdefghijklmnop"
+
+
+inputDanceMoves : () -> List DanceMove
+inputDanceMoves _ =
     Parser.run danceParser input
-        |> Result.map (dance "abcdefghijklmnop")
+        |> Result.withDefault []
+
+
+solution : () -> String
+solution _ =
+    dance initialLineup (inputDanceMoves ())
