@@ -1,4 +1,4 @@
-module Part1 exposing (..)
+module Main exposing (..)
 
 import Dict exposing (Dict)
 import Char
@@ -25,6 +25,7 @@ type alias State =
     , direction : Direction
     , reverseLetters : List Char
     , reachedEnd : Bool
+    , count : Int
     }
 
 
@@ -67,6 +68,7 @@ init str =
         , direction = Down
         , reverseLetters = []
         , reachedEnd = False
+        , count = 0
         }
 
 
@@ -91,6 +93,7 @@ keepGoing state =
     { state
         | point =
             go state.direction state.point
+        , count = state.count + 1
     }
 
 
@@ -121,12 +124,14 @@ turnCorner state =
                 { state
                     | point = point1
                     , direction = dir1
+                    , count = state.count + 1
                 }
 
             ( False, True ) ->
                 { state
                     | point = point2
                     , direction = dir2
+                    , count = state.count + 1
                 }
 
             _ ->
@@ -154,16 +159,18 @@ next state =
             { state | reachedEnd = True }
 
 
-navigate : State -> String
+navigate : State -> ( String, Int )
 navigate state =
     if state.reachedEnd then
-        List.reverse state.reverseLetters
+        ( List.reverse state.reverseLetters
             |> String.fromList
+        , state.count
+        )
     else
         navigate (next state)
 
 
-answer : String -> String
+answer : String -> ( String, Int )
 answer str =
     init str
         -- |> Debug.log "init"
