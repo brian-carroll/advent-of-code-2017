@@ -42,7 +42,7 @@ type Instruction
     | Add RegName Operand
     | Mul RegName Operand
     | Mod RegName Operand
-    | Rcv Operand
+    | Rcv RegName
     | Jgz Operand Operand
 
 
@@ -87,7 +87,7 @@ instructionParser =
         , succeed Add |. symbol "add" |. space |= regParser |. space |= operandParser
         , succeed Mul |. symbol "mul" |. space |= regParser |. space |= operandParser
         , succeed Mod |. symbol "mod" |. space |= regParser |. space |= operandParser
-        , succeed Rcv |. symbol "rcv" |. space |= operandParser
+        , succeed Rcv |. symbol "rcv" |. space |= regParser
         , succeed Jgz |. symbol "jgz" |. space |= operandParser |. space |= operandParser
         ]
 
@@ -182,10 +182,10 @@ execute ({ registers, lastSound, program, progCounter } as state) =
                                     |> write reg
                         }
 
-                    Rcv op ->
+                    Rcv reg ->
                         { state
                             | recovered =
-                                if valueOf op > 0 then
+                                if read reg > 0 then
                                     Just state.lastSound
                                 else
                                     state.recovered
@@ -218,8 +218,5 @@ answer _ =
     Parser.run programParser input
         |> Result.map
             (\prog ->
-                { init
-                    | program = prog
-                }
-                    |> runProgram
+                runProgram { init | program = prog }
             )
