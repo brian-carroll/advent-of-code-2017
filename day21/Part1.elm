@@ -1,20 +1,9 @@
 module Part1 exposing (..)
 
-{-
-   operations
-       flip H
-       flip V
-       rotate 90
-       rotate 180
-       rotate 270
-       split 4 -> 2
-       count
-
--}
-
 import Dict exposing (Dict)
 import Types exposing (..)
-import Rulebook exposing (startingPattern, fromString)
+import Rulebook exposing (Rulebook, startingPattern, fromString)
+import Input
 
 
 bitToString : Bit -> String
@@ -50,7 +39,7 @@ flipCols : Int -> Pattern -> Pattern
 flipCols side pattern =
     Dict.foldl
         (\( r, c ) val acc ->
-            Dict.insert ( r, side - c ) val acc
+            Dict.insert ( r, side - 1 - c ) val acc
         )
         Dict.empty
         pattern
@@ -60,7 +49,7 @@ flipRows : Int -> Pattern -> Pattern
 flipRows side pattern =
     Dict.foldl
         (\( r, c ) val acc ->
-            Dict.insert ( side - r, c ) val acc
+            Dict.insert ( side - 1 - r, c ) val acc
         )
         Dict.empty
         pattern
@@ -70,7 +59,7 @@ rot90 : Int -> Pattern -> Pattern
 rot90 side pattern =
     Dict.foldl
         (\( r, c ) val acc ->
-            Dict.insert ( side - c, r ) val acc
+            Dict.insert ( side - 1 - c, r ) val acc
         )
         Dict.empty
         pattern
@@ -107,30 +96,9 @@ breakOffSmallPattern side bigPattern ( rChunk, cChunk ) =
             bigPattern
 
 
-split : Pattern -> Dict Point Pattern
-split pattern =
-    {-
-       figure out how many regions we want
-           (div by 2 or 3, whichever fits)
-       generate (x,y) offsets
-       fold over offsets
-            generate list of points in little pattern
-            fold over points
-                get value from bigpattern, put in little pattern
-    -}
+split : Int -> Int -> Pattern -> Dict Point Pattern
+split side chunkSize pattern =
     let
-        side =
-            Dict.size pattern
-                |> toFloat
-                |> sqrt
-                |> round
-
-        chunkSize =
-            if side % 2 == 0 then
-                2
-            else
-                3
-
         chunksPerSide =
             side // chunkSize
 
@@ -149,9 +117,154 @@ split pattern =
             (\offset acc ->
                 let
                     smallPattern =
-                        breakOffSmallPattern side pattern offset
+                        breakOffSmallPattern chunkSize pattern offset
                 in
                     Dict.insert offset smallPattern acc
             )
             Dict.empty
             offsets
+
+
+tryModifiers : Pattern -> Rulebook -> Maybe Pattern -> List (Pattern -> Pattern) -> Pattern
+tryModifiers pattern rulebook output modifiers =
+    case output of
+        Just out ->
+            out
+
+        Nothing ->
+            case modifiers of
+                [] ->
+                    Debug.crash "no modifier worked"
+
+                current :: rest ->
+                    let
+                        hashKey =
+                            current pattern
+                                |> patternToString
+
+                        nextOutput =
+                            Dict.get hashKey rulebook
+                    in
+                        tryModifiers pattern rulebook nextOutput rest
+
+
+enhanceSinglePattern : Int -> Rulebook -> Pattern -> Pattern
+enhanceSinglePattern side rulebook pattern =
+    tryModifiers pattern rulebook Nothing <|
+        [ identity
+        , flipRows side
+        , flipCols side
+        , rot90 side
+        , rot90 side >> rot90 side
+        , rot90 side >> rot90 side >> rot90 side
+        , flipRows side >> rot90 side
+        , flipRows side >> rot90 side >> rot90 side
+        , flipRows side >> rot90 side >> rot90 side >> rot90 side
+        , flipCols side >> rot90 side
+        , flipCols side >> rot90 side >> rot90 side
+        , flipCols side >> rot90 side >> rot90 side >> rot90 side
+        ]
+
+
+enhance : Int -> Rulebook -> Dict Point Pattern -> Dict Point Pattern
+enhance chunkSize rulebook splitPatterns =
+    Dict.map
+        (\_ pattern -> enhanceSinglePattern chunkSize rulebook pattern)
+        splitPatterns
+
+
+join : Int -> Dict Point Pattern -> Pattern
+join chunkSize splitPatterns =
+    Dict.foldl
+        (\( rChunk, cChunk ) subPattern outerAcc ->
+            Dict.foldl
+                (\( r, c ) bit innerAcc ->
+                    Dict.insert
+                        ( r + (rChunk * chunkSize)
+                        , c + (cChunk * chunkSize)
+                        )
+                        bit
+                        innerAcc
+                )
+                outerAcc
+                subPattern
+        )
+        Dict.empty
+        splitPatterns
+
+
+singleIteration : Rulebook -> Pattern -> Pattern
+singleIteration rulebook pattern =
+    let
+        side =
+            Dict.size pattern
+                |> toFloat
+                |> sqrt
+                |> round
+
+        ( smallChunk, bigChunk ) =
+            if side % 2 == 0 then
+                ( 2, 3 )
+            else
+                ( 3, 4 )
+    in
+        pattern
+            |> split side smallChunk
+            |> enhance smallChunk rulebook
+            |> join bigChunk
+
+
+loop : Rulebook -> Int -> Pattern -> Pattern
+loop rulebook n pattern =
+    if n > 0 then
+        let
+            nextPattern =
+                singleIteration rulebook pattern
+        in
+            loop rulebook (n - 1) nextPattern
+    else
+        pattern
+
+
+exampleTwoIterations : String
+exampleTwoIterations =
+    "##.##./#..#../....../##.##./#..#../......"
+
+
+testTwoIterations : () -> Bool
+testTwoIterations () =
+    let
+        rulebook =
+            Rulebook.fromString Input.example
+                |> Result.withDefault Dict.empty
+
+        actual =
+            loop rulebook 2 startingPattern
+    in
+        patternToString actual == exampleTwoIterations
+
+
+countOnBits : Pattern -> Int
+countOnBits pattern =
+    Dict.foldl
+        (\_ bit acc ->
+            case bit of
+                On ->
+                    acc + 1
+
+                Off ->
+                    acc
+        )
+        0
+        pattern
+
+
+answer : String -> Int
+answer input =
+    let
+        rulebook =
+            Rulebook.fromString Input.input
+                |> Result.withDefault Dict.empty
+    in
+        loop rulebook 5 startingPattern
+            |> countOnBits
