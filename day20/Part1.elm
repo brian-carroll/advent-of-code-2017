@@ -5,7 +5,7 @@ import Parser exposing (..)
 
 
 type alias Triplet =
-    ( Int, Int, Int )
+    { x : Int, y : Int, z : Int }
 
 
 type alias Particle =
@@ -27,7 +27,7 @@ intParser =
 
 tripletParser : Parser Triplet
 tripletParser =
-    succeed (,,)
+    succeed Triplet
         |. symbol "<"
         |= intParser
         |. symbol ","
@@ -58,7 +58,7 @@ inputParser =
 
 
 manhattan : Triplet -> Int
-manhattan ( x, y, z ) =
+manhattan { x, y, z } =
     abs x + abs y + abs z
 
 
