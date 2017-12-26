@@ -148,28 +148,52 @@ tryModifiers pattern rulebook output modifiers =
                         tryModifiers pattern rulebook nextOutput rest
 
 
-enhanceSinglePattern : Int -> Rulebook -> Pattern -> Pattern
+enhanceSinglePattern : Int -> Rulebook -> Pattern -> ( Pattern, Rulebook )
 enhanceSinglePattern side rulebook pattern =
-    tryModifiers pattern rulebook Nothing <|
-        [ identity
-        , flipRows side
-        , flipCols side
-        , rot90 side
-        , rot90 side >> rot90 side
-        , rot90 side >> rot90 side >> rot90 side
-        , flipRows side >> rot90 side
-        , flipRows side >> rot90 side >> rot90 side
-        , flipRows side >> rot90 side >> rot90 side >> rot90 side
-        , flipCols side >> rot90 side
-        , flipCols side >> rot90 side >> rot90 side
-        , flipCols side >> rot90 side >> rot90 side >> rot90 side
-        ]
+    let
+        hash =
+            patternToString pattern
+    in
+        case Dict.get hash rulebook of
+            Just bigPattern ->
+                ( bigPattern, rulebook )
+
+            Nothing ->
+                let
+                    bigPattern =
+                        tryModifiers pattern rulebook Nothing <|
+                            [ identity
+                            , flipRows side
+                            , flipCols side
+                            , rot90 side
+                            , rot90 side >> rot90 side
+                            , rot90 side >> rot90 side >> rot90 side
+                            , flipRows side >> rot90 side
+                            , flipRows side >> rot90 side >> rot90 side
+                            , flipRows side >> rot90 side >> rot90 side >> rot90 side
+                            , flipCols side >> rot90 side
+                            , flipCols side >> rot90 side >> rot90 side
+                            , flipCols side >> rot90 side >> rot90 side >> rot90 side
+                            ]
+                in
+                    ( bigPattern
+                    , Dict.insert hash bigPattern rulebook
+                    )
 
 
-enhance : Int -> Rulebook -> Dict Point Pattern -> Dict Point Pattern
+enhance : Int -> Rulebook -> Dict Point Pattern -> ( Dict Point Pattern, Rulebook )
 enhance chunkSize rulebook splitPatterns =
-    Dict.map
-        (\_ pattern -> enhanceSinglePattern chunkSize rulebook pattern)
+    Dict.foldl
+        (\point pattern ( accSplitPatterns, accRulebook ) ->
+            let
+                ( bigPattern, updatedRulebook ) =
+                    enhanceSinglePattern chunkSize rulebook pattern
+            in
+                ( Dict.insert point bigPattern accSplitPatterns
+                , updatedRulebook
+                )
+        )
+        ( Dict.empty, rulebook )
         splitPatterns
 
 
@@ -193,7 +217,7 @@ join chunkSize splitPatterns =
         splitPatterns
 
 
-singleIteration : Rulebook -> Pattern -> Pattern
+singleIteration : Rulebook -> Pattern -> ( Pattern, Rulebook )
 singleIteration rulebook pattern =
     let
         side =
@@ -207,21 +231,30 @@ singleIteration rulebook pattern =
                 ( 2, 3 )
             else
                 ( 3, 4 )
+
+        ( enhanced, updatedRulebook ) =
+            pattern
+                |> split side smallChunk
+                |> enhance smallChunk rulebook
     in
-        pattern
-            |> split side smallChunk
-            |> enhance smallChunk rulebook
-            |> join bigChunk
+        ( join bigChunk enhanced
+        , updatedRulebook
+        )
 
 
 loop : Rulebook -> Int -> Pattern -> Pattern
 loop rulebook n pattern =
     if n > 0 then
         let
-            nextPattern =
+            ( nextPattern, nextRulebook ) =
                 singleIteration rulebook pattern
+
+            _ =
+                ( Debug.log "Iterations left" (n - 1)
+                , Debug.log "Bits ON" (countOnBits nextPattern)
+                )
         in
-            loop rulebook (n - 1) nextPattern
+            loop nextRulebook (n - 1) nextPattern
     else
         pattern
 
@@ -259,12 +292,12 @@ countOnBits pattern =
         pattern
 
 
-answer : String -> Int
-answer input =
+answer : String -> Int -> Int
+answer input n =
     let
         rulebook =
             Rulebook.fromString Input.input
                 |> Result.withDefault Dict.empty
     in
-        loop rulebook 5 startingPattern
+        loop rulebook n startingPattern
             |> countOnBits
